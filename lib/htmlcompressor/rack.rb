@@ -20,22 +20,31 @@ module HtmlCompressor
       :remove_http_protocol => false,
       :remove_https_protocol => false,
       :preserve_line_breaks => false,
-      :simple_boolean_attributes => true
+      :simple_boolean_attributes => true,
+      :compress_by_default => true
     }
 
     def initialize app, options = {}
       @app = app
-
-      options = DEFAULT_OPTIONS.merge(options)
-
-      @compressor = HtmlCompressor::Compressor.new(options)
-
+      @options = DEFAULT_OPTIONS.merge(options)
+      @compressor = HtmlCompressor::Compressor.new(@options)
     end
 
     def call env
       status, headers, body = @app.call(env)
 
-      if headers.key? 'Content-Type' and headers['Content-Type'] =~ /html/
+      path = Rails.application.routes.recognize_path(env['PATH_INFO'])
+      compress_info = path[:compress]
+      should_we_compress = @options[:compress_by_default]
+      if (compress_info == true)
+        should_we_compress = true
+      elsif (compress_info == false)
+        should_we_compress = false
+      else (compress_info == nil)
+        # Do nothing, leave default
+      end
+
+      if headers.key? 'Content-Type' and headers['Content-Type'] =~ /html/ and should_we_compress
         content = ''
 
         body.each do |part|
